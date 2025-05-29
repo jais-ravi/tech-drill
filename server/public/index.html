@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Resume Analyzer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      background: #f5f8fa;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 520px;
+      background: #fff;
+      margin: 40px auto;
+      border-radius: 12px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.09);
+      padding: 32px 36px 24px 36px;
+    }
+    h1 {
+      text-align: center;
+      color: #0077b6;
+      margin-bottom: 1.5em;
+    }
+    label {
+      display: block;
+      font-weight: 500;
+      margin-top: 1.1em;
+      margin-bottom: 0.3em;
+      color: #22223b;
+    }
+    input[type="file"], textarea {
+      width: 100%;
+      font-size: 1em;
+      margin-bottom: 0.5em;
+      padding: 8px;
+      border: 1px solid #dde2ed;
+      border-radius: 6px;
+      background: #f9fafb;
+      box-sizing: border-box;
+      resize: vertical;
+    }
+    textarea {
+      min-height: 80px;
+      max-height: 180px;
+      font-family: inherit;
+    }
+    .or {
+      text-align: center;
+      color: #888;
+      font-size: 0.98em;
+      margin: 0.5em 0 1em 0;
+      font-style: italic;
+    }
+    button {
+      width: 100%;
+      background: linear-gradient(90deg, #0077b6 60%, #00b4d8 100%);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 12px;
+      font-size: 1.08em;
+      font-weight: bold;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      margin-top: 1em;
+      transition: background 0.2s;
+    }
+    button:hover {
+      background: linear-gradient(90deg, #023e8a 60%, #0096c7 100%);
+    }
+    #results {
+      margin-top: 2em;
+      background: #e7f2fa;
+      border-radius: 8px;
+      padding: 18px 16px;
+      font-size: 1.02em;
+      color: #222;
+      box-shadow: 0 2px 8px rgba(0,100,200,0.08);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1em;
+      background: #fafdff;
+    }
+    th, td {
+      padding: 8px;
+      border: 1px solid #dee2e6;
+      text-align: center;
+    }
+    th {
+      background: #e0eafc;
+      color: #0077b6;
+      font-weight: 600;
+    }
+    .suggestion-high {
+      color: #008000;
+      font-weight: bold;
+    }
+    .suggestion-mid {
+      color: #e48b00;
+      font-weight: bold;
+    }
+    .suggestion-low {
+      color: #c10000;
+      font-weight: bold;
+    }
+    @media (max-width: 600px) {
+      .container {
+        padding: 18px 6px 16px 6px;
+        max-width: 99vw;
+      }
+      table, th, td {
+        font-size: 0.96em;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Resume Analyzer</h1>
+    <form id="analyzeForm" enctype="multipart/form-data">
+      <label>Job Description (PDF/DOCX/TXT):</label>
+      <input type="file" name="jd" accept=".pdf,.docx,.txt" />
+
+      <div class="or">— OR —</div>
+
+      <label>Write or Paste Job Description:</label>
+      <textarea name="jd_text" placeholder="Type or paste job description here..."></textarea>
+
+      <label>Resumes (PDF/DOCX/TXT, multiple allowed):</label>
+      <input type="file" name="resumes" accept=".pdf,.docx,.txt" multiple required />
+
+      <button type="submit">Analyze</button>
+    </form>
+    <div id="results"></div>
+  </div>
+  <script>
+    document.getElementById('analyzeForm').onsubmit = async function(e) {
+      e.preventDefault();
+      const formData = new FormData(this);
+      // Remove empty jd file if only text is provided
+      const jdFile = formData.get('jd');
+      const jdText = formData.get('jd_text')?.trim();
+      if ((!jdFile || (jdFile && jdFile.size === 0)) && !jdText) {
+        alert("Please upload a JD file or write/paste a job description.");
+        return;
+      }
+      const resultsDiv = document.getElementById('results');
+      resultsDiv.innerHTML = "Analyzing...";
+
+      try {
+        const res = await fetch('/analyze', {
+          method: 'POST',
+          body: formData,
+        });
+        const out = await res.json();
+        if (out.results && out.results.length > 0) {
+          resultsDiv.innerHTML = `
+            <h3>Results</h3>
+            <table>
+              <tr>
+                <th>Resume Name</th>
+                <th>Score</th>
+                <th>Suggestion</th>
+              </tr>
+              ${out.results.map(r => `
+                <tr>
+                  <td>${r.name || 'N/A'}</td>
+                  <td><b>${(r.score * 100).toFixed(1)}%</b></td>
+                  <td>
+                    <span class="${
+                      r.suggestion === 'Highly Suggested'
+                        ? 'suggestion-high'
+                        : r.suggestion === 'Suggested'
+                        ? 'suggestion-mid'
+                        : 'suggestion-low'
+                    }">${r.suggestion}</span>
+                  </td>
+                </tr>
+              `).join('')}
+            </table>
+          `;
+        } else {
+          resultsDiv.innerHTML = `<span style="color:#c10000;">${out.error || 'No results found or error occurred.'}</span>`;
+        }
+      } catch (err) {
+        resultsDiv.innerHTML = `<span style="color:#c10000;">Error: ${err.message}</span>`;
+      }
+    };
+  </script>
+</body>
+</html>
